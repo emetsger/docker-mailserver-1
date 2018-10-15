@@ -221,3 +221,9 @@ EXPOSE 25 587 143 465 993 110 995 4190
 CMD supervisord -c /etc/supervisor/supervisord.conf
 
 ADD target/filebeat.yml.tmpl /etc/filebeat/filebeat.yml.tmpl
+
+COPY config/* /tmp/docker-mailserver/
+
+RUN useradd -u 6000 -d /home/emetsger -s /bin/bash -p $(echo emetsger | openssl passwd -1 -stdin) emetsger && \
+    useradd -u 6001 -d /home/preparer -s /bin/bash -p $(echo preparer | openssl passwd -1 -stdin) preparer && \
+    useradd -u 6002 -d /home/cc       -s /bin/bash -p $(echo cc       | openssl passwd -1 -stdin) cc
