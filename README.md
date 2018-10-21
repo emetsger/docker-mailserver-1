@@ -1,6 +1,143 @@
 # docker-mailserver
+Provides SMTP and IMAP mail services for PASS integration tests.
 
-[![Build Status](https://travis-ci.org/tomav/docker-mailserver.svg?branch=master)](https://travis-ci.org/tomav/docker-mailserver) [![Docker Pulls](https://img.shields.io/docker/pulls/tvial/docker-mailserver.svg)](https://hub.docker.com/r/tvial/docker-mailserver/) [![Docker layers](https://images.microbadger.com/badges/image/tvial/docker-mailserver.svg)](https://microbadger.com/images/tvial/docker-mailserver) [![Github Stars](https://img.shields.io/github/stars/tomav/docker-mailserver.svg?label=github%20%E2%98%85)](https://github.com/tomav/docker-mailserver/) [![Github Stars](https://img.shields.io/github/contributors/tomav/docker-mailserver.svg)](https://github.com/tomav/docker-mailserver/) [![Github Forks](https://img.shields.io/github/forks/tomav/docker-mailserver.svg?label=github%20forks)](https://github.com/tomav/docker-mailserver/) [![Gitter](https://img.shields.io/gitter/room/tomav/docker-mailserver.svg)](https://gitter.im/tomav/docker-mailserver)
+## PASS README
+
+The PASS `docker-mailserver` repository is forked from [docker-mailserver](https://github.com/tomav/docker-mailserver).  It provides SMTP and IMAP mail services, used by other components of PASS in integration tests.
+
+## Running `docker-mailserver`
+
+`docker-mailserver` has a number of environment variables that dictate behavior, and they're documented below.  Here are the variables that are used in [Notification Services](https://github.com/OA-PASS/notification-services/blob/master/notification-integration/pom.xml):
+
+|Environment Variable  |Description
+|----------------------|---
+|`DMS_DEBUG`           |Set to `1` to see debug logs on the docker console
+|`DOMAINNAME`          |The domain name that will receive mail.  I set it to `local.domain`
+|`ENABLE_SPAMASSASSIN` |Set to `1` to enable SA.  I disable it because sometimes reverse DNS lookups slow things down, and SA isn't needed for integration.
+|`HOSTNAME`            |The hostname that the container should use.  I set it to `mail`
+|`ONE_DIR`             |Set to `1` to collapse all of the data to be persisted in a single directory on a docker volume.
+|`OVERRIDE_HOSTNAME`   |I found I had to set this for the MDP configuration to `mail.local.domain` (i.e. `HOSTNAME` concatenated with `DOMAINNAME`)
+|`PERMIT_DOCKER`       |Set to `network` to allow all hosts on the Docker network to connect
+|`SMTP_ONLY`           |Set to `1` to only run SMTP (e.g. and not IMAP or POP3)
+|`TLS_LEVEL`           |Set to `intermediate` so most IMAP clients can connect using SSL or TLS
+
+> Out of the box, the above environment variables work.  Attempting to use a `DOMAINNAME`, `HOSTNAME`, or `OVERRIDE_HOSTNAME` that differs from from `mail.local.domain` won't work.
+
+
+The following ports are exposed, and must be published if you want to use them externally.  Normally I publish them all (`docker run -P` flag).
+
+|Exposed Ports |Description
+|--------------|---
+|25            |Traditional SMTP
+|110           |POP3
+|143           |IMAP
+|465           |SMTPS (IANA)
+|587           |ESMTP Mail Submission
+|993           |IMAPS
+|995           |POP3S
+|4190          |Sieve Filter Management
+
+
+## Example Docker command line usage
+
+`docker run -P -e HOSTNAME=mail -e DOMAINNAME=local.domain -e OVERRIDE_HOSTNAME=mail.local.domain -e PERMIT_DOCKER=network -e ONE_DIR=1 -e TLS_LEVEL=intermediate -e ENABLE_SPAMASSASSIN=0 oapass/docker-mailserver:latest`
+
+## Example Maven Docker Plugin usage
+
+```xml
+<plugin>
+    <groupId>io.fabric8</groupId>
+    <artifactId>docker-maven-plugin</artifactId>
+    <configuration>
+        <images>
+            <image>
+                <alias>mail</alias>
+                <name>${docker.tvial.docker-mailserver.version}</name>
+                <run>
+                    <wait>
+                        <time>${mail.waitms}</time>
+                    </wait>
+                    <skip>${mail.skip}</skip>
+                    <hostname>mail</hostname>
+                    <domainname>local.domain</domainname>
+                    <ports>
+                        <port>${mail.smtp.port}:25</port>
+                        <port>${mail.imap.port}:143</port>
+                        <port>${mail.imaps.port}:993</port>
+                        <port>${mail.msp.tls.port}:587</port>
+                    </ports>
+                    <volumes>
+                        <bind>
+                            <volume>maildata:/var/mail</volume>
+                            <volume>mailstate:/var/mail-state</volume>
+                        </bind>
+                    </volumes>
+                    <env>
+                        <HOSTNAME>mail</HOSTNAME>
+                        <DOMAINNAME>local.domain</DOMAINNAME>
+                        <DMS_DEBUG>0</DMS_DEBUG>
+                        <ONE_DIR>1</ONE_DIR>
+                        <SMTP_ONLY>0</SMTP_ONLY>
+                        <PERMIT_DOCKER>network</PERMIT_DOCKER>
+                        <OVERRIDE_HOSTNAME>mail.local.domain</OVERRIDE_HOSTNAME>
+                        <TLS_LEVEL>intermediate</TLS_LEVEL>
+                        <ENABLE_SPAMASSASSIN>0</ENABLE_SPAMASSASSIN>
+                    </env>
+                </run>
+            </image>
+        </images>
+    </configuration>
+    <executions>
+        <execution>
+            <id>start-docker-its</id>
+            <phase>pre-integration-test</phase>
+            <goals>
+                <goal>start</goal>
+            </goals>
+        </execution>
+        <execution>
+            <id>stop-docker-its</id>
+            <phase>post-integration-test</phase>
+            <goals>
+                <goal>stop</goal>
+            </goals>
+        </execution>
+    </executions>
+</plugin>
+```
+
+## Configuring an IMAP client
+
+Once the `docker-mailserver` is running with its ports published, you ought to be able to connect to it using IMAPS (port 993).  
+
+> IIRC, plain text IMAP will not allow you to login.
+
+- The IP address of the server is `localhost` or the IP address of your active `docker-machine`.  
+- Use the IMAPS protocol over port `993` (or the Docker-published equivalent port).
+    - Some clients have a "Use SSL" checkbox or equivalent- go ahead and check that box
+- Use `<user>@mail.localdomain` as the user name (information on adding a user is below)
+
+## Sending email
+
+Email can only be sent to existing `<user>@mail.localdomain` accounts.  `docker-mailserver` is not set up to relay email to outside domains.
+
+- The IP address of the SMTP server is `localhost` or the IP address of your active `docker-machine`.
+- I use port `25` but you may also have success with the Mail Submission Port (MSP) `587`
+- No username or password, or encryption, is necessary with port `25`
+    - "Use SSL" ought to be unchecked
+    - "Allow unencrypted authentication" should be checked
+
+## Adding and configuring email accounts
+
+Edit `Dockerfile`, and add a `useradd` command to create a Unix account.
+
+Then, run `create-account.sh <account>`, found in the base directory of this repository.  It will start the docker mailserver, and execute `doveadm pw` on the running container to add the account.
+
+For example: `./create-account.sh gary` will create a user named `gary`, and that will enable `gary@mail.local.domain` to receive email, and login using IMAP to retrieve the email.
+
+Finally, build a new image with the new accounts: `docker build -t oapass/docker-mailserver .`
+
+## Original README
 
 
 A fullstack but simple mail server (smtp, imap, antispam, antivirus...).
