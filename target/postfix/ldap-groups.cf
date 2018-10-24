@@ -1,9 +1,9 @@
 bind                     = yes
-bind_dn                  = cn=admin,dc=domain,dc=com
-bind_pw                  = admin
+bind_dn                  = cn=admin,dc=pass
+bind_pw                  = password
 query_filter             = (&(mailGroupMember=%s)(mailEnabled=TRUE))
 result_attribute         = mail
-search_base              = ou=people,dc=domain,dc=com
-server_host              = mail.domain.com
+search_base              = ou=People,dc=pass
+server_host              = ldap
 start_tls                = no
 version                  = 3
