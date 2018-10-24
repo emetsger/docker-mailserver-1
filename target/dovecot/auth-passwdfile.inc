@@ -5,7 +5,7 @@
 
 passdb {
   driver = passwd-file
-  args = scheme=CRYPT username_format=%u /etc/dovecot/userdb
+  args = scheme=SHA512-CRYPT username_format=%u /etc/dovecot/userdb
 }
 
 userdb {
