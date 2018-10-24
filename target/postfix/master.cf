@@ -16,7 +16,7 @@ tlsproxy   unix -       -       n       -       0       tlsproxy
 dnsblog    unix -       -       n       -       0       dnsblog                 
 submission inet n       -       n       -       -       smtpd
   -o syslog_name=postfix/submission
-  -o smtpd_tls_security_level=encrypt
+  -o smtpd_tls_security_level=none
   -o smtpd_sasl_auth_enable=yes
   -o smtpd_sasl_type=dovecot
   -o smtpd_sasl_path=private/auth
