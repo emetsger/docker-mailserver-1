@@ -1136,7 +1136,7 @@ function _setup_postfix_dhparam() {
 		if [ ! -f $DHPARAMS_FILE ]; then
 			notify 'inf' "Generate new dhparams for postfix"
 			mkdir -p $(dirname "$DHPARAMS_FILE")
-			openssl dhparam -out $DHPARAMS_FILE 2048
+			openssl dhparam -out $DHPARAMS_FILE 128
 		else
 			notify 'inf' "Use dhparams that was generated previously"
 		fi
