@@ -1,4 +1,152 @@
-# docker-mailserver
+# PASS Docker Mail Server
+
+## Testing Docker Mail Server
+
+### Start the LDAP and mail containers
+
+The easiest and most reliable way to start the LDAP and mail containers is to check out [pass-docker](https://github.com/OA-PASS/pass-docker), and run `docker-compose up mail ldap`.  The `pass-docker` project properly configures the `docker-mailserver` environment to communicate with LDAP.
+
+* the LDAP image is in Docker Hub tagged as `oapass/ldap:<date>`
+    * It is also available to be built from [pass-docker](https://github.com/OA-PASS/pass-docker), see the `ldap` service in the docker-compose file.
+* the mail server image is in Docker Hub tagged as `oapass/docker-mailserver:<date>`
+    * It is also available to be built from this repository
+* the `ldap` container is required when `ENABLE_LDAP=1` is present in the `docker-mailserver` environment.
+
+The [pass-docker](https://github.com/OA-PASS/pass-docker) integration environment configures LDAP communication between `docker-mailserver` and `ldap` using environment variables.  When `ENABLE_LDAP=1` is set (see the [.env file](https://github.com/OA-PASS/pass-docker/blob/master/.env)), additional environment variables configure LDAP communication between the two containers.
+
+Startup of the `docker-mailserver` is complete when you see the following line in the log output:
+> `mail postfix/master[1428]: daemon started -- version 3.1.8, configuration /etc/postfix`
+
+### Testing SMTP mail submission
+
+#### Connect to the Mail Submission Port
+
+Once the `ldap` and `docker-mailserver` containers are running, connect to the SMTP Mail Submission Port (MSP), by default port `11587`.  SSL and/or TLS is not used.
+
+> `telnet <dockerhost> 11587`
+
+```
+$ telnet 192.168.99.100 11587
+Trying 192.168.99.100...
+Connected to pass.local.
+Escape character is '^]'.
+220 mail.jhu.edu ESMTP Postfix (Debian)
+```
+
+#### Send an email to an @jhu.edu address
+
+Note at the moment that the recipient address does not have to exist; `docker-mailserver` will happily queue any message addressed to an `@jhu.edu` recipient.
+
+```
+MAIL FROM: barr@blah.com
+250 2.1.0 Ok
+RCPT TO: foo@jhu.edu
+250 2.1.5 Ok
+DATA
+354 End data with <CR><LF>.<CR><LF>
+hi
+.
+250 2.0.0 Ok: queued as 41445380540
+```
+
+Disconnect by typing the command `QUIT`
+
+#### Attempt to send an email to a non-@jhu.edu address
+
+`docker-mailserver` is configured to disallow email message relaying for any messages not addressed to `@jhu.edu`.
+
+```
+MAIL FROM: barr@blah.com
+250 2.1.0 Ok
+RCPT TO: foo@bar.com
+554 5.7.1 <foo@bar.com>: Relay access denied
+```
+
+Disconnect by typing the command `QUIT`
+
+### Testing IMAPS and LDAP login
+
+#### Connect to the IMAPS port using SSL
+
+Once the `ldap` and `docker-mailserver` containers are running, connect to the IMAPS port using the `openssl` client.  By default port `11993` is the published IMAPS port.
+
+> `openssl s_client -connect <dockerhost>:11993`
+
+```
+$ openssl s_client -connect 192.168.99.100
+CONNECTED(00000003)
+depth=0 /O=Dovecot mail server/OU=@commonName@/CN=@commonName@/emailAddress=@emailAddress@
+verify error:num=18:self signed certificate
+verify return:1
+depth=0 /O=Dovecot mail server/OU=@commonName@/CN=@commonName@/emailAddress=@emailAddress@
+verify return:1
+---
+Certificate chain
+ 0 s:/O=Dovecot mail server/OU=@commonName@/CN=@commonName@/emailAddress=@emailAddress@
+   i:/O=Dovecot mail server/OU=@commonName@/CN=@commonName@/emailAddress=@emailAddress@
+---
+Server certificate
+-----BEGIN CERTIFICATE-----
+MIIDZjCCAk6gAwIBAgIJAIMvy+eHFGIzMA0GCSqGSIb3DQEBCwUAMGsxHDAaBgNV
+BAoME0RvdmVjb3QgbWFpbCBzZXJ2ZXIxFTATBgNVBAsMDEBjb21tb25OYW1lQDEV
+MBMGA1UEAwwMQGNvbW1vbk5hbWVAMR0wGwYJKoZIhvcNAQkBFg5AZW1haWxBZGRy
+ZXNzQDAeFw0xODEwMjUxOTE1MDFaFw0xOTEwMjUxOTE1MDFaMGsxHDAaBgNVBAoM
+E0RvdmVjb3QgbWFpbCBzZXJ2ZXIxFTATBgNVBAsMDEBjb21tb25OYW1lQDEVMBMG
+A1UEAwwMQGNvbW1vbk5hbWVAMR0wGwYJKoZIhvcNAQkBFg5AZW1haWxBZGRyZXNz
+QDCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBALzrPDQML08FncYGF0O3
+opJszHWIk2j+aRjCNhBxiJVNgts4PGQmr4yaW5EVyzPlSY27opUiBLF5khhyqRkj
+b18yadZ9ikIxSNZWq089X74SiF8UTRsGvxsED+woFZw3v4DOuC7XeflFNiSqYLE3
+yU7u4KDaNwtz3JHv07jeFTPwTFPbXuxyDL1OVp9NPuFylsdH8445jWofvvMvtLZO
+KwTYiM2nQitdivuoaqrChJb9Z9rPs5OUopQa5yRo/M428Df1WEiN9KT9FK+pu71G
+ijqSt5ibzTxX59sEbyORP18SgMZb27ywE4o/S34es5aFR4M3E6LSYXwMLTc9tJju
+7GMCAwEAAaMNMAswCQYDVR0TBAIwADANBgkqhkiG9w0BAQsFAAOCAQEAXwganEu6
+f13pyHZrRfF1uEm/WMQ0Rmn9bHyFF6jOqbTR4iKH5TA4NLPDA4nwpZ3nncxTo5D2
+NC0TDOsYsHcvdAePuSL79CZx8WTKNnlxXU5R7/UKaDMkdAEPW9AN+ReUW1rC8cp5
+8GztTXLfGhu8i2jQqbbp8oVfJyByiQKlAljtDM2g6IrFX8SwpoOygGjDkkTNHQh2
+HUuPtYhiAVKY5rLeGu6WwK5mtz2ryLdWjqJY+jQefFYjsJ+2gOchMcG5RWpy1gNa
+OftY88tTqlfAlw5xpw5BzxSkBSrm0Z9t9s/6HyjQ3YmYv8nqpTVZoyWJJ+ygDkZi
+UFuSDXvVY9eYiA==
+-----END CERTIFICATE-----
+subject=/O=Dovecot mail server/OU=@commonName@/CN=@commonName@/emailAddress=@emailAddress@
+issuer=/O=Dovecot mail server/OU=@commonName@/CN=@commonName@/emailAddress=@emailAddress@
+---
+No client certificate CA names sent
+---
+SSL handshake has read 1829 bytes and written 456 bytes
+---
+New, TLSv1/SSLv3, Cipher is DHE-RSA-AES128-SHA
+Server public key is 2048 bit
+Secure Renegotiation IS supported
+Compression: NONE
+Expansion: NONE
+SSL-Session:
+    Protocol  : TLSv1
+    Cipher    : DHE-RSA-AES128-SHA
+    Session-ID: A414B8BDBA16D3C1F4E7BED0D53233BF45DC5D3C41DE145A4C22DB41908C4B5C
+    Session-ID-ctx: 
+    Master-Key: 1DAC86AFFA0A3D777279423ACD19D86A4C36EF438993F2B93CBC99AAE7235154985FB7286F6093CD18E14682D75CFDA6
+    Key-Arg   : None
+    Start Time: 1540559114
+    Timeout   : 300 (sec)
+    Verify return code: 18 (self signed certificate)
+---
+* OK [CAPABILITY IMAP4rev1 LITERAL+ SASL-IR LOGIN-REFERRALS ID ENABLE IDLE AUTH=PLAIN AUTH=LOGIN] Dovecot (Debian) ready.
+```
+
+#### Login with an account in LDAP
+
+After connecting, login with a username and password that is present in LDAP.
+
+> A1 LOGIN <username> <password>
+
+```
+A1 LOGIN staffWithGrants@jhu.edu moo
+A1 OK [CAPABILITY IMAP4rev1 LITERAL+ SASL-IR LOGIN-REFERRALS ID ENABLE IDLE SORT SORT=DISPLAY THREAD=REFERENCES THREAD=REFS THREAD=ORDEREDSUBJECT MULTIAPPEND URL-PARTIAL CATENATE UNSELECT CHILDREN NAMESPACE UIDPLUS LIST-EXTENDED I18NLEVEL=1 CONDSTORE QRESYNC ESEARCH ESORT SEARCHRES WITHIN CONTEXT=SEARCH LIST-STATUS BINARY MOVE SNIPPET=FUZZY SPECIAL-USE] Logged in
+```
+
+If login fails, look at the logs of the mail server and ldap server to see what may be wrong.
+
+# docker-mailserver (original README from upstream fork)
 
 [![Build Status](https://travis-ci.org/tomav/docker-mailserver.svg?branch=master)](https://travis-ci.org/tomav/docker-mailserver) [![Docker Pulls](https://img.shields.io/docker/pulls/tvial/docker-mailserver.svg)](https://hub.docker.com/r/tvial/docker-mailserver/) [![Docker layers](https://images.microbadger.com/badges/image/tvial/docker-mailserver.svg)](https://microbadger.com/images/tvial/docker-mailserver) [![Github Stars](https://img.shields.io/github/stars/tomav/docker-mailserver.svg?label=github%20%E2%98%85)](https://github.com/tomav/docker-mailserver/) [![Github Stars](https://img.shields.io/github/contributors/tomav/docker-mailserver.svg)](https://github.com/tomav/docker-mailserver/) [![Github Forks](https://img.shields.io/github/forks/tomav/docker-mailserver.svg?label=github%20forks)](https://github.com/tomav/docker-mailserver/) [![Gitter](https://img.shields.io/gitter/room/tomav/docker-mailserver.svg)](https://gitter.im/tomav/docker-mailserver)
 
