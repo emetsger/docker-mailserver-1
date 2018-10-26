@@ -2,6 +2,24 @@
 
 ## Testing Docker Mail Server
 
+This fork of `docker-mailserver` is purpose-built to support integration testing of PASS components.  `docker-mailserver` requires the `ldap` container be up and running because:
+- Users logging in with IMAP are authenticated against LDAP
+- Recipient addresses and their email delivery location are resolved against LDAP
+- Accepts email for the `@jhu.edu` domain only.
+    - Any DN under `dc=People,dc=pass` with a `mail` attribute value ending in `@jhu.edu` is a valid recipient.  
+        - i.e. any user defined in LDAP (see `users.ldif`) should be allowed to send mail, receive mail, and authenticate using IMAPS to check incoming mail.
+    - IMAP user names are the email address of the user
+        - e.g. login with usernames like `staffWithGrants@jhu.edu` or `grant-admin-submitter@jhu.edu`
+
+In addition, the configuration of `docker-mailserver` supports mail submission on port `587`, and IMAPS on port `993` (note that in a Docker environment these are `EXPOSE`d ports, and they may be published on different ports - e.g. `11587` and `11993` in `pass-docker`) 
+
+- Use port 587 for email submission [(RFC 4409)](https://tools.ietf.org/html/rfc4409)
+    - no TLS, no SSL
+    - by default published on port `11587` (in `pass-docker`)
+- Use port 993 for IMAPS or TLS (authentication is disabled for unencrypted IMAP)
+    - must use TLS or SSL
+    - by default published on port `11993` (in `pass-docker`)
+
 ### Start the LDAP and mail containers
 
 The easiest and most reliable way to start the LDAP and mail containers is to check out [pass-docker](https://github.com/OA-PASS/pass-docker), and run `docker-compose up mail ldap`.  The `pass-docker` project properly configures the `docker-mailserver` environment to communicate with LDAP.
